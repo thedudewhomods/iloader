@@ -63,7 +63,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Initialize Tauri Android project
-        run: bun tauri android init --app-name iloader --identifier com.thedudewhomods.iloaderandroid
+        run: bun tauri android init
 
       - name: Check Rust Android target
         working-directory: src-tauri
