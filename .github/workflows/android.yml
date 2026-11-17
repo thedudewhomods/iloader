@@ -1,0 +1,75 @@
+name: Android APK (port validation)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - android/**
+    paths:
+      - ".github/workflows/android.yml"
+      - "src-tauri/**"
+      - "src/**"
+      - "package.json"
+      - "bun.lock"
+      - "bun.lockb"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: android-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  android:
+    name: Build iLoader Android arm64
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - name: Checkout iLoader
+        uses: actions/checkout@v4
+
+      - name: Install Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Install Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install Android platform and NDK
+        shell: bash
+        run: |
+          sdkmanager "platform-tools" "platforms;android-35" "build-tools;35.0.0" "ndk;27.2.12479018"
+          echo "ANDROID_NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+          echo "NDK_HOME=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-linux-android
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Install frontend dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Initialize Tauri Android project
+        run: |
+          if [ ! -d src-tauri/gen/android ]; then
+            bunx tauri android init
+          fi
+
+      - name: Build Android APK
+        run: bunx tauri android build --target aarch64 --debug
+
+      - name: Upload APK (only if compilation succeeds)
+        uses: actions/upload-artifact@v4
+        with:
+          name: iloader-android-arm64-debug
+          path: src-tauri/gen/android/app/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
